@@ -20,8 +20,8 @@ var sp = new SerialPort(PORT, {
 
 // TCP info
 var tcpPort = '1307';
-// var tcpHost = 'www.swtch.co';
-var tcpHost = '169.254.38.35';
+var tcpHost = 'www.swtch.co';
+// var tcpHost = '169.254.38.35';
     
 // Buffers and helpers
 var serialBuffer = "";
@@ -51,9 +51,28 @@ setup = function() {
 };
 
 loop = function() {
-    // sp.write("TEST");
-    // clog('sent signal');
-    // delay(1000);
+    if (clientBuffer != "") {
+        separatorIndex = clientBuffer.indexOf(separator);
+        foundMessage = separatorIndex != -1;
+    
+        if (foundMessage) {
+            var message = clientBuffer.slice(0, separatorIndex);
+            clientProcess(message);
+            clientBuffer = clientBuffer.slice(separatorIndex + 1);
+            separatorIndex = clientBuffer.indexOf(separator);
+        }
+    }
+    if (serialBuffer != "") {
+        separatorIndex = serialBuffer.indexOf(separator);
+        foundMessage = separatorIndex != -1;
+    
+        if (foundMessage) {
+            var message = serialBuffer.slice(0, separatorIndex);
+            deviceProcess(message);
+            serialBuffer = serialBuffer.slice(separatorIndex + 1);
+            separatorIndex = serialBuffer.indexOf(separator);
+        }
+    }
 };
 
 // TCP client
@@ -66,29 +85,11 @@ var client = net.createConnection(tcpPort, tcpHost, function() {
 client.on('data', function (chunk) {
     clog("From TCP: " + chunk);
     clientBuffer += chunk;
-    separatorIndex = clientBuffer.indexOf(separator);
-    foundMessage = separatorIndex != -1;
-    
-    if (foundMessage) {
-        var message = clientBuffer.slice(0, separatorIndex);
-        clientProcess(message);
-        clientBuffer = clientBuffer.slice(separatorIndex + 1);
-        separatorIndex = clientBuffer.indexOf(separator);
-    }
 });
 
 sp.on('data', function (chunk) {
     clog("From Serial: " + chunk);
     serialBuffer += chunk;
-    separatorIndex = serialBuffer.indexOf(separator);
-    foundMessage = separatorIndex != -1;
-    
-    if (foundMessage) {
-        var message = serialBuffer.slice(0, separatorIndex);
-        deviceProcess(message);
-        serialBuffer = serialBuffer.slice(separatorIndex + 1);
-        separatorIndex = serialBuffer.indexOf(separator);
-    }
 });
 
 bb.run();
