@@ -14,9 +14,8 @@ usrPin = bone.USR3
 # Serial info
 PORT = "/dev/ttyO1"
 BAUD_RATE = 9600
-sp = new SerialPort(PORT,
+sp = new SerialPort PORT,
 	baudrate: BAUD_RATE
-	)
 
 # TCP info
 tcpPort = '1307'
