@@ -1,21 +1,13 @@
 // Requirements
-var fs = require('fs');
-var bb = require('../bonescript');
-var SerialPort = require('serialport').SerialPort;
+var SerialPort = require("serialport").SerialPort;
 var net = require ('net');
 
-// Instantiate the serial pins
-var serialIn = bone.P9_26;
-var serialOut = bone.P9_24;
-
-// Instantiate the user LEDs, for feedback
-var usrPin = bone.USR3;
-
 // Serial info
-var PORT = "/dev/ttyO1";
+var PORT = "/dev/tty.usbserial-AH00SC1B";
 var BAUD_RATE = 9600;
 var sp = new SerialPort(PORT, {
     baudrate: BAUD_RATE
+	
 });
 
 // TCP info
@@ -26,8 +18,12 @@ var tcpHost = 'www.swtch.co';
 // Buffers and helpers
 var serialBuffer = "";
 var clientBuffer = "";
-var separator = "\n";
+var separator = '\n';
 var devices = {};
+var foundSerialMessage = false;
+var foundClientMessage = false;
+var serialSeparatorIndex = -1;
+var clientSeparatorIndex = -1;
 
 ts = function() {
     var d = new Date().toTimeString();
@@ -39,39 +35,14 @@ clog = function(msg) {
     console.log(ts() + ": " + msg);
 };
 
-setup = function() {
-    pinMode(usrPin, OUTPUT);
-    
-    // Make sure the pinmux is mode 0 (TX/RX)
-    // Really, this should be done using pinMode as above - but we can't use that for TX/RX yet
-    // var serialInMuxfile = fs.open("/sys/kernel/debug/omap_mux/" + serialIn.mux, "w");
-    // var serialOutMuxfile = fs.open("/sys/kernel/debug/omap_mux/" + serialOut.mux, "w");
-    // fs.write(serialInMuxfile, "20", null);
-    // fs.write(serialOutMuxfile, "0", null);
-};
+
 
 loop = function() {
     if (clientBuffer != "") {
-        separatorIndex = clientBuffer.indexOf(separator);
-        foundMessage = separatorIndex != -1;
-    
-        if (foundMessage) {
-            var message = clientBuffer.slice(0, separatorIndex);
-            clientProcess(message);
-            clientBuffer = clientBuffer.slice(separatorIndex + 1);
-            separatorIndex = clientBuffer.indexOf(separator);
-        }
+        
     }
     if (serialBuffer != "") {
-        separatorIndex = serialBuffer.indexOf(separator);
-        foundMessage = separatorIndex != -1;
-    
-        if (foundMessage) {
-            var message = serialBuffer.slice(0, separatorIndex);
-            deviceProcess(message);
-            serialBuffer = serialBuffer.slice(separatorIndex + 1);
-            separatorIndex = serialBuffer.indexOf(separator);
-        }
+        
     }
 };
 
@@ -85,14 +56,31 @@ var client = net.createConnection(tcpPort, tcpHost, function() {
 client.on('data', function (chunk) {
     clog("From TCP: " + chunk);
     clientBuffer += chunk;
+	clientSeparatorIndex = clientBuffer.indexOf(separator);
+    foundClientMessage = clientSeparatorIndex != -1;
+
+    if (foundClientMessage) {
+        var message = clientBuffer.slice(0, clientSeparatorIndex);
+        clientProcess(message);
+        clientBuffer = clientBuffer.slice(clientSeparatorIndex + 1);
+        clientSeparatorIndex = clientBuffer.indexOf(separator);
+    }
 });
 
 sp.on('data', function (chunk) {
     clog("From Serial: " + chunk);
     serialBuffer += chunk;
-});
+	serialSeparatorIndex = serialBuffer.indexOf(separator);
+    foundSerialMessage = serialSeparatorIndex != -1;
 
-bb.run();
+    if (foundSerialMessage) {
+		clog("Found message");
+        var message = serialBuffer.slice(0, serialSeparatorIndex);
+        deviceProcess(message);
+        serialBuffer = serialBuffer.slice(serialSeparatorIndex + 1);
+        serialSeparatorIndex = serialBuffer.indexOf(separator);
+    }
+});
 
 // Processes JSON messages received from the server
 clientProcess = function(message) {
@@ -129,8 +117,9 @@ clientProcess = function(message) {
     }
     
     if (devices[deviceid].dimval != msgobj.dimval) {
-		var message = 'dim' + msgobj.dimval;
-		serialSend(deviceid, message);
+		var msg = deviceid + ",dim" + msgobj.dimval + "\n";
+		clog("Sending message: " + msg);
+		sp.write(msg);
     }
     
     devices[deviceid] = msgobj;
@@ -162,10 +151,4 @@ deviceProcess = function(message) {
     devices[msgobj.deviceid] = msgobj;
     client.write(JSON.stringify(msgobj));
     client.write("\n");
-}
-
-serialSend = function(device, message) {
-	var msg = device + ',' + message + '\n';
-	clog("Sending: " + msg);
-	sp.write(msg);
 }

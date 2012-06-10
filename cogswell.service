@@ -1,0 +1,11 @@
+[Unit]
+Description=SWITCH Cogswell
+ConditionPathExists=|/var/lib/cloud9
+
+[Service]
+WorkingDirectory=/var/lib/cloud9/cogswell
+ExecStart=/usr/bin/coffee app.coffee
+
+[Install]
+WantedBy=multi-user.target
+
