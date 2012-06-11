@@ -55,10 +55,14 @@ cd /var/lib/cloud9/
 npm -g install coffee-script
 
 # Fix the pinmuxing so that XBee can communicate over serial.
+# NOTE: In theory I don't have to do this because it's part of the app.coffee script.
 echo 20 > /sys/kernel/debug/omap_mux/uart1_rxd
 echo 0 > /sys/kernel/debug/omap_mux/uart1_txd
 
+# If we need to kill the cogswell process, we should do so like so:
+systemctl kill cogswell.service
+
 # STILL TO DO:
 # Create a cronjob to automate updates. NOTE: Gonna skip this one for now.
-# Create a systemd service that launches our script.
+
 # Set up wireless internet.
