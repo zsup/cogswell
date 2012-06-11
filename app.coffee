@@ -38,17 +38,18 @@ clog = (msg) ->
 # Make sure the pinmux is mode 0 (TX/RX), with recieving enabled for RX.
 # When both the input and output pins are prepped, serialReady == 1. That means go.
 path = "/sys/kernel/debug/omap_mux"
-rxMode = new Buffer "20"
-txMode = new Buffer "0"
+rxMode = "20"
+txMode = "0"
 
 # RX pinmuxing
 fs.open "#{path}/uart1_rxd", "w", 0o0666, (err, fd) ->
 	throw error if err
 	clog "RX Mux file opened"
-	fs.write fd, rxMode, null, null, null, (err, fd) ->
+	fs.write fd, rxMode, null, null, ->
 		throw error if err
 		clog "RX file written"
-		fs.close fd, ->
+		fs.close fd, (err) ->
+			throw error if err
 			clog "RX file closed"
 			serialReady++
 
@@ -56,10 +57,11 @@ fs.open "#{path}/uart1_rxd", "w", 0o0666, (err, fd) ->
 fs.open "#{path}/uart1_txd", "w", 0o0666, (err, fd) ->
 	throw error if err
 	clog "TX Mux file opened"
-	fs.write fd, txMode, null, null, null, (err, fd) ->
+	fs.write fd, txMode, null, null, ->
 		throw error if err
 		clog "TX file written"
-		fs.close fd, ->
+		fs.close fd, (err) ->
+			throw error if err
 			clog "TX file closed"
 			serialReady++
 
@@ -174,5 +176,6 @@ serialSend = (device, message) ->
 # Sends the message character by character.
 # Done recursively so that a delay can be added.
 recursiveSend = (msg) ->
-	sp.write msg.substring(0,1)
-	setTimeout recursiveSend, serialDelay, msg.substring(1)
+	if msg.length > 0
+		sp.write msg.substring(0,1)
+		setTimeout recursiveSend, serialDelay, msg.substring(1)
