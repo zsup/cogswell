@@ -4,14 +4,16 @@ SerialPort = require("serialport").SerialPort
 net = require 'net'
 
 # Serial info
-PORT = "/dev/ttyO1"
+PORT = "/dev/ttyO1" # For the BeagleBone
+# PORT = "/dev/tty.usbserial-AH00SC1B" # For on the computer
 BAUD_RATE = 9600
 sp = new SerialPort PORT,
 	baudrate: BAUD_RATE
 
 # TCP info
 tcpPort = '1307'
-tcpHost = 'www.swtch.co'
+tcpHost = 'www.swtch.co' # For using swtch.co
+# tcpHost = '169.254.116.57' # For using local network
 
 # Buffers and helpers
 # TODO: Make these buffers into actual Node.js Buffers?
@@ -22,6 +24,8 @@ devices = {}
 serialDelay = 5
 serialReady = -1
 clientReady = 0
+serialBusy = false
+tryAgain = 100
 
 ts = ->
 	d = new Date().toTimeString()
@@ -133,7 +137,8 @@ clientProcess = (message) ->
 		return
 		
 	if devices[deviceid].devicestatus != msgobj.devicestatus
-		message = "turn#{msgobj.devicestatus}"
+		message = "turnOn" if msgobj.devicestatus is 1
+		message = "turnOff" if msgobj.devicestatus is 0
 		serialSend deviceid, message
 		
 	if devices[deviceid].dimval != msgobj.dimval
@@ -169,13 +174,19 @@ deviceProcess = (message) ->
 
 # Sends messages down the serial channel.
 serialSend = (device, message) ->
-	msg = "#{device},#{message}#{separator}"
-	clog "Sending: #{msg}"
-	recursiveSend msg
+	if serialBusy
+		setTimeout serialSend, tryAgain, device, message
+	else
+		msg = "#{device},#{message}#{separator}"
+		clog "Sending: #{msg}"
+		recursiveSend msg
 
 # Sends the message character by character.
 # Done recursively so that a delay can be added.
 recursiveSend = (msg) ->
 	if msg.length > 0
+		serialBusy = true
 		sp.write msg.substring(0,1)
 		setTimeout recursiveSend, serialDelay, msg.substring(1)
+	else
+		serialBusy = false
